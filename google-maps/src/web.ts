@@ -121,17 +121,22 @@ export class CapacitorGoogleMapsWeb
     language?: string,
   ) {
     if (this.gMapsRef === undefined) {
-      const lib = await import('@googlemaps/js-api-loader');
-      const loader = new lib.Loader({
-        apiKey: apiKey ?? '',
-        version: 'weekly',
-        libraries: ['places'],
-        language,
-        region,
-      });
-      const google = await loader.load();
-      this.gMapsRef = google.maps;
-      console.log('Loaded google maps API');
+      if (!window.google.maps) {
+        const lib = await import('@googlemaps/js-api-loader');
+        const loader = new lib.Loader({
+          apiKey: apiKey ?? '',
+          version: 'weekly',
+          libraries: ['places'],
+          language,
+          region,
+        });
+        const google = await loader.load();
+        this.gMapsRef = google.maps;
+        console.log('Loaded google maps API');
+      } else {
+        this.gMapsRef = window.google.maps;
+        console.log('Google maps API already loaded');
+      }
     }
   }
 
