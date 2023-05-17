@@ -131,6 +131,7 @@ customElements.define('capacitor-google-map', MapCustomElement);
 export class GoogleMap {
   private id: string;
   private element: HTMLElement | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   private onBoundsChangedListener?: PluginListenerHandle;
   private onCameraIdleListener?: PluginListenerHandle;
@@ -189,6 +190,48 @@ export class GoogleMap {
 
     if (Capacitor.isNativePlatform()) {
       (options.element as any) = {};
+
+      const lastState = {
+        width: elementBounds.width,
+        height: elementBounds.height,
+        isHidden: false,
+      };
+      newMap.resizeObserver = new ResizeObserver(() => {
+        if (newMap.element != null) {
+          const mapRect = newMap.element.getBoundingClientRect();
+          const mapBounds = {
+            x: mapRect.x,
+            y: mapRect.y,
+            width: mapRect.width,
+            height: mapRect.height,
+          };
+          const isHidden = mapRect.width === 0 && mapRect.height === 0;
+
+          if (!isHidden && lastState.isHidden) {
+            if (Capacitor.getPlatform() == 'ios') {
+              setTimeout(() => {
+                CapacitorGoogleMaps.onDisplay({
+                  id: newMap.id,
+                  mapBounds,
+                });
+              }, 700);
+            }
+          } else if (
+            lastState.width !== mapRect.width ||
+            lastState.height !== mapRect.height
+          ) {
+            CapacitorGoogleMaps.onResize({
+              id: newMap.id,
+              mapBounds,
+            });
+          }
+
+          lastState.width = mapRect.width;
+          lastState.height = mapRect.height;
+          lastState.isHidden = isHidden;
+        }
+      });
+      newMap.resizeObserver.observe(newMap.element);
     }
 
     await CapacitorGoogleMaps.create(options);
@@ -369,6 +412,10 @@ export class GoogleMap {
   async destroy(): Promise<void> {
     if (Capacitor.getPlatform() == 'android') {
       this.disableScrolling();
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      this.resizeObserver?.disconnect();
     }
 
     this.removeAllMapListeners();
