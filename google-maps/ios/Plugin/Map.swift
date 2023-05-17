@@ -71,6 +71,7 @@ public class Map {
     var polygons = [Int: GMSPolygon]()
     var circles = [Int: GMSCircle]()
     var polylines = [Int: GMSPolyline]()
+    var features = [String: GMUGeometryRenderer]()
     var markerIcons = [String: UIImage]()
 
     // swiftlint:disable weak_delegate
@@ -381,6 +382,74 @@ public class Map {
                     self.polylines.removeValue(forKey: id)
                 }
             }
+        }
+    }
+
+    func addFeatures(type: String, data: JSObject, idPropertyName: String, styles: JSObject) throws -> [String] {
+        var featureIds: [String] = []
+
+        DispatchQueue.main.sync {
+            let jsonData : Data = try! JSONSerialization.data(withJSONObject: data, options: [])
+            let geoJSONParser = GMUGeoJSONParser(data: jsonData)
+            geoJSONParser.parse()
+
+            for container in geoJSONParser.features {
+                if let tempFeature = container as? GMUFeature, let propertes = tempFeature.properties, let featureId = propertes[idPropertyName] as? String {
+                    if let renderer = self.features[featureId] {
+                        renderer.clear()
+                        self.features.removeValue(forKey: featureId)
+                    }
+
+                    let feature = GMUFeature(geometry: tempFeature.geometry, identifier: featureId, properties: tempFeature.properties, boundingBox: nil)
+
+                    featureIds.append(featureId)
+
+                    if let stylesData = (styles as [String: Any])[featureId] as? [String: Any] {
+                        if let strokeColor = stylesData["strokeColor"] as? String,
+                           let strokeOpacity = stylesData["strokeOpacity"] as? Double,
+                           let stroke = UIColor.init(hex: strokeColor)?.withAlphaComponent(strokeOpacity),
+                           let fillColor = stylesData["fillColor"] as? String,
+                           let fillOpacity = stylesData["fillOpacity"] as? Double,
+                           let fill = UIColor.init(hex: fillColor)?.withAlphaComponent(fillOpacity)
+                        {
+                            let style = GMUStyle(styleID: "styleId", stroke: stroke, fill: fill, width: stylesData["strokeWeight"] as? Double ?? 1, scale: 2, heading: 0, anchor: CGPoint(x: 0, y: 0), iconUrl: nil, title: nil, hasFill: true, hasStroke: true)
+                            feature.style = style
+                        }
+                    }
+                    
+                    let renderer = GMUGeometryRenderer(map: self.mapViewController.GMapView, geometries: [feature])
+                    renderer.render()
+                    
+                    self.features[featureId] = renderer
+                }
+            }
+        }
+
+        return featureIds
+    }
+
+    func getFeatureBounds(featureId: String) throws -> GMSCoordinateBounds {
+        if let renderer = self.features[featureId] {
+            var bounds: GMSCoordinateBounds!
+
+            DispatchQueue.main.sync {
+                bounds = renderer.getBounds()
+            }
+
+            return bounds
+        } else {
+            throw GoogleMapErrors.unhandledError("feature not found")
+        }
+    }
+
+    func removeFeature(featureId: String) throws {
+        if let renderer = self.features[featureId] {
+            DispatchQueue.main.async {
+                renderer.clear()
+                self.features.removeValue(forKey: featureId)
+            }
+        } else {
+            throw GoogleMapErrors.unhandledError("feature not found")
         }
     }
 
@@ -696,5 +765,41 @@ extension UIImage {
         let resizedImage = UIGraphicsGetImageFromCurrentImageContext()!
         UIGraphicsEndImageContext()
         return resizedImage
+    }
+}
+
+extension GMUGeometryRenderer {
+    func getBounds() -> GMSCoordinateBounds {
+        var bounds = GMSCoordinateBounds.init()
+
+        for overlay in self.mapOverlays() {
+            if let circle = overlay as? GMSCircle {
+                bounds = bounds.includingBounds(circle.getBounds())
+            }
+            if let groundOverlay = overlay as? GMSGroundOverlay, let groundOverlayBounds = groundOverlay.bounds {
+                bounds = bounds.includingBounds(groundOverlayBounds)
+            }
+            if let marker = overlay as? GMSMarker {
+                bounds = bounds.includingCoordinate(marker.position)
+            }
+            if let polygon = overlay as? GMSPolygon, let polygonPath = polygon.path {
+                bounds = bounds.includingPath(polygonPath)
+            }
+            if let polyline = overlay as? GMSPolyline, let polylinePath = polyline.path {
+                bounds = bounds.includingPath(polylinePath)
+            }
+        }
+
+        return bounds
+    }
+}
+
+extension GMSCircle {
+    func getBounds() -> GMSCoordinateBounds {
+        var bounds = GMSCoordinateBounds.init(
+            coordinate: GMSGeometryOffset(self.position, self.radius * sqrt(2.0), 225),
+            coordinate: GMSGeometryOffset(self.position, self.radius * sqrt(2.0), 45)
+        )
+        return bounds
     }
 }
