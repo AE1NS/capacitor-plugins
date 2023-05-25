@@ -174,17 +174,102 @@ export interface StyleSpan {
 /**
  * For web, all the javascript Google Maps options are available as
  * GoogleMapConfig extends google.maps.MapOptions.
- * For iOS and Android only the config options declared on GoogleMapConfig are available.
+ * For iOS and Android the following options from google.maps.MapOptions with the same signature are additionally available:
+ * - gestureHandling ('none' | 'auto')
+ * - mapTypeId
+ * - maxZoom
+ * - minZoom
+ * - restriction
+ * - styles
  */
 export interface GoogleMapConfig extends google.maps.MapOptions {
   /**
-   * Override width for native map.
+   * Show accessibility elements for overlay objects, such as Marker and Polyline.
+   *
+   * Only available on iOS.
    */
-  width?: number;
+  isAccessibilityElementsEnabled?: boolean;
+  /**
+   * Enables or disables the compass.
+   */
+  isCompassEnabled?: boolean;
+  /**
+   * Sets whether a button should be displayed, which centers the camera to the users current position.
+   */
+  isMyLocationButtonEnabled?: boolean;
+  /**
+   * Sets whether the My Location dot and accuracy circle is enabled.
+   */
+  isMyLocationEnabled?: boolean;
+  /**
+   * Sets whether indoor maps should be enabled.
+   *
+   * Only available on Android and iOS.
+   */
+  isIndoorMapsEnabled?: boolean;
+  /**
+   * Sets the preference for whether rotate gestures should be enabled or disabled.
+   */
+  isRotateGesturesEnabled?: boolean;
+  /**
+   * Sets the preference for whether tilt gestures should be enabled or disabled.
+   */
+  isTiltGesturesEnabled?: boolean;
+  /**
+   * Sets the preference for whether the Map Toolbar should be enabled or disabled.
+   *
+   * Only available on Android.
+   */
+  isToolbarEnabled?: boolean;
+  /**
+   * Turns the traffic layer on or off.
+   */
+  isTrafficLayerEnabled?: boolean;
+  /**
+   * Sets the preference for whether zoom gestures should be enabled or disabled.
+   */
+  isZoomGesturesEnabled?: boolean;
+  /**
+   * Padding on the 'visible' region of the view.
+   */
+  padding?: MapPadding;
+}
+
+/**
+ * For web, all the javascript Google Maps options are available as
+ * GoogleMapCreateConfig extends google.maps.MapOptions.
+ * For iOS and Android the following options from google.maps.MapOptions with the same signature are additionally available:
+ * - gestureHandling ('none' | 'auto')
+ * - mapTypeId
+ * - maxZoom
+ * - minZoom
+ * - restriction
+ * - styles
+ * - zoom
+ */
+export interface GoogleMapCreateConfig extends GoogleMapConfig {
+  /**
+   * Enables image-based lite mode on Android.
+   *
+   * @default false
+   */
+  androidLiteMode?: boolean;
+  /**
+   * The Map center.
+   */
+  center: LatLng;
+  /**
+   * Override pixel ratio for native map.
+   */
+  devicePixelRatio?: number;
   /**
    * Override height for native map.
    */
   height?: number;
+  /**
+   * Override width for native map.
+   */
+  width?: number;
   /**
    * Override absolute x coordinate position for native map.
    */
@@ -193,32 +278,6 @@ export interface GoogleMapConfig extends google.maps.MapOptions {
    * Override absolute y coordinate position for native map.
    */
   y?: number;
-  /**
-   * Default location on the Earth towards which the camera points.
-   */
-  center: LatLng;
-  /**
-   * Sets the zoom of the map.
-   */
-  zoom: number;
-  /**
-   * Enables image-based lite mode on Android.
-   *
-   * @default false
-   */
-  androidLiteMode?: boolean;
-  /**
-   * Override pixel ratio for native map.
-   */
-  devicePixelRatio?: number;
-  /**
-   * Styles to apply to each of the default map types. Note that for
-   * satellite, hybrid and terrain modes,
-   * these styles will only apply to labels and geometry.
-   *
-   * @since 4.3.0
-   */
-  styles?: google.maps.MapTypeStyle[] | null;
 }
 
 /**
