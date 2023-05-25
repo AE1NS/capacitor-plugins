@@ -21,6 +21,7 @@ import type {
   PolylineCallbackData,
   FeatureType,
   FeatureStyles,
+  GoogleMapConfig,
 } from './definitions';
 import { LatLngBounds, MapType } from './definitions';
 import type { CreateMapArgs } from './implementation';
@@ -33,6 +34,8 @@ export interface GoogleMapInterface {
   ): Promise<GoogleMap>;
   enableTouch(): Promise<void>;
   disableTouch(): Promise<void>;
+  update(config: GoogleMapConfig): Promise<void>;
+  getOptions(): GoogleMapConfig | null;
   enableClustering(
     /**
      * The minimum number of markers that can be clustered together. The default is 4 markers.
@@ -62,13 +65,32 @@ export interface GoogleMapInterface {
   setCamera(config: CameraConfig): Promise<void>;
   /**
    * Get current map type
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
    */
   getMapType(): Promise<MapType>;
+  /**
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
+   */
   setMapType(mapType: MapType): Promise<void>;
+  /**
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
+   */
   enableIndoorMaps(enabled: boolean): Promise<void>;
+  /**
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
+   */
   enableTrafficLayer(enabled: boolean): Promise<void>;
+  /**
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
+   */
   enableAccessibilityElements(enabled: boolean): Promise<void>;
+  /**
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
+   */
   enableCurrentLocation(enabled: boolean): Promise<void>;
+  /**
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
+   */
   setPadding(padding: MapPadding): Promise<void>;
   setOnBoundsChangedListener(
     callback?: MapListenerCallback<CameraIdleCallbackData>,
@@ -144,6 +166,7 @@ export class GoogleMap {
   private id: string;
   private element: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private config: GoogleMapConfig | null = null;
 
   private onBoundsChangedListener?: PluginListenerHandle;
   private onCameraIdleListener?: PluginListenerHandle;
@@ -177,6 +200,7 @@ export class GoogleMap {
     callback?: MapListenerCallback<MapReadyCallbackData>,
   ): Promise<GoogleMap> {
     const newMap = new GoogleMap(options.id);
+    newMap.config = options.config;
 
     if (!options.element) {
       throw new Error('container element is required');
@@ -219,23 +243,25 @@ export class GoogleMap {
           };
           const isHidden = mapRect.width === 0 && mapRect.height === 0;
 
-          if (!isHidden && lastState.isHidden) {
-            if (Capacitor.getPlatform() == 'ios') {
-              setTimeout(() => {
-                CapacitorGoogleMaps.onDisplay({
-                  id: newMap.id,
-                  mapBounds,
-                });
-              }, 700);
+          if (!isHidden) {
+            if (lastState.isHidden) {
+              if (Capacitor.getPlatform() == 'ios') {
+                setTimeout(() => {
+                  CapacitorGoogleMaps.onDisplay({
+                    id: newMap.id,
+                    mapBounds,
+                  });
+                }, 700);
+              }
+            } else if (
+              lastState.width !== mapRect.width ||
+              lastState.height !== mapRect.height
+            ) {
+              CapacitorGoogleMaps.onResize({
+                id: newMap.id,
+                mapBounds,
+              });
             }
-          } else if (
-            lastState.width !== mapRect.width ||
-            lastState.height !== mapRect.height
-          ) {
-            CapacitorGoogleMaps.onResize({
-              id: newMap.id,
-              mapBounds,
-            });
           }
 
           lastState.width = mapRect.width;
@@ -308,6 +334,39 @@ export class GoogleMap {
     return CapacitorGoogleMaps.disableTouch({
       id: this.id,
     });
+  }
+
+  /**
+   * Update map options
+   *
+   * @returns void
+   */
+  async update(config: GoogleMapConfig): Promise<void> {
+    Object.assign(this.config as any, config);
+
+    // Convert restriction latLngBounds to LatLngBoundsLiteral if its in LatLngBounds format
+    if (
+      config.restriction?.latLngBounds &&
+      (config.restriction.latLngBounds as any)?.toJSON
+    ) {
+      config.restriction.latLngBounds = (
+        config.restriction.latLngBounds as google.maps.LatLngBounds
+      ).toJSON();
+    }
+
+    return CapacitorGoogleMaps.update({
+      id: this.id,
+      config,
+    });
+  }
+
+  /**
+   * Get map options
+   *
+   * @returns void
+   */
+  getOptions(): GoogleMapConfig | null {
+    return this.config;
   }
 
   /**
@@ -505,9 +564,13 @@ export class GoogleMap {
     });
   }
 
+  /**
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
+   */
   async getMapType(): Promise<MapType> {
-    const { type } = await CapacitorGoogleMaps.getMapType({ id: this.id });
-    return MapType[type as keyof typeof MapType];
+    return Promise.resolve(
+      MapType[this.getOptions()?.mapTypeId as keyof typeof MapType],
+    );
   }
 
   /**
@@ -515,11 +578,14 @@ export class GoogleMap {
    *
    * @param mapType
    * @returns
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
    */
   async setMapType(mapType: MapType): Promise<void> {
-    return CapacitorGoogleMaps.setMapType({
+    return CapacitorGoogleMaps.update({
       id: this.id,
-      mapType,
+      config: {
+        mapTypeId: mapType,
+      },
     });
   }
 
@@ -528,11 +594,14 @@ export class GoogleMap {
    *
    * @param enabled
    * @returns
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
    */
   async enableIndoorMaps(enabled: boolean): Promise<void> {
-    return CapacitorGoogleMaps.enableIndoorMaps({
+    return CapacitorGoogleMaps.update({
       id: this.id,
-      enabled,
+      config: {
+        isIndoorMapsEnabled: enabled,
+      },
     });
   }
 
@@ -541,11 +610,14 @@ export class GoogleMap {
    *
    * @param enabled
    * @returns
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
    */
   async enableTrafficLayer(enabled: boolean): Promise<void> {
-    return CapacitorGoogleMaps.enableTrafficLayer({
+    return CapacitorGoogleMaps.update({
       id: this.id,
-      enabled,
+      config: {
+        isTrafficLayerEnabled: enabled,
+      },
     });
   }
 
@@ -556,11 +628,14 @@ export class GoogleMap {
    *
    * @param enabled
    * @returns
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
    */
   async enableAccessibilityElements(enabled: boolean): Promise<void> {
-    return CapacitorGoogleMaps.enableAccessibilityElements({
+    return CapacitorGoogleMaps.update({
       id: this.id,
-      enabled,
+      config: {
+        isAccessibilityElementsEnabled: enabled,
+      },
     });
   }
 
@@ -569,11 +644,14 @@ export class GoogleMap {
    *
    * @param enabled
    * @returns
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
    */
   async enableCurrentLocation(enabled: boolean): Promise<void> {
-    return CapacitorGoogleMaps.enableCurrentLocation({
+    return CapacitorGoogleMaps.update({
       id: this.id,
-      enabled,
+      config: {
+        isMyLocationEnabled: enabled,
+      },
     });
   }
 
@@ -582,11 +660,14 @@ export class GoogleMap {
    *
    * @param padding
    * @returns
+   * @deprecated This function will be removed in v6. Use {@link #update()} instead.
    */
   async setPadding(padding: MapPadding): Promise<void> {
-    return CapacitorGoogleMaps.setPadding({
+    return CapacitorGoogleMaps.update({
       id: this.id,
-      padding,
+      config: {
+        padding,
+      },
     });
   }
 
