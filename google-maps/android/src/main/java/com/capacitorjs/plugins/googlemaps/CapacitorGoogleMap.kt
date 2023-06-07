@@ -920,6 +920,9 @@ class CapacitorGoogleMap(
         markerOptions.alpha(marker.opacity)
         markerOptions.flat(marker.isFlat)
         markerOptions.draggable(marker.draggable)
+        if (marker.zIndex != null) {
+            markerOptions.zIndex(marker.zIndex!!)
+        }
 
         if (!marker.iconUrl.isNullOrEmpty()) {
             if (this.markerIcons.contains(marker.iconUrl)) {
