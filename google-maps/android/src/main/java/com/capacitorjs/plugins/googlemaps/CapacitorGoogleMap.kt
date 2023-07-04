@@ -393,6 +393,7 @@ class CapacitorGoogleMap(
                             this@CapacitorGoogleMap.buildMarker(marker)
                         }
                 val googleMapMarker = googleMap?.addMarker(markerOptions.await())
+                googleMapMarker?.showInfoWindow()
 
                 marker.googleMapMarker = googleMapMarker
 
